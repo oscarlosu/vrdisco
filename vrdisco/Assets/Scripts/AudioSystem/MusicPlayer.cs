@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using MusicSystem;
 using UnityEngine;
 using UnityEngine.Audio;
+using UnityEngine.Events;
 
 namespace MusicSystem
 {
@@ -15,7 +16,6 @@ namespace MusicSystem
         {
             get { return _sampleSize; }
         }
-
         public int FreqBandCount
         {
             get { return _freqBandCount; }
@@ -37,6 +37,9 @@ namespace MusicSystem
         private float[] _freqBandHighest;
         private float[] _normalisedFreqBand;
         private float[] _normalisedBandBuffer;
+
+        public UnityEvent MusicStartEvent;
+        public UnityEvent MusicEndEvent;
 
         private void Awake()
         {
@@ -79,11 +82,25 @@ namespace MusicSystem
         {
             SetupPlayer(musicPiece);
             _audioSource.Play();
+            CallMusicStartEvent();
+            Invoke("CallMusicEndEvent", _audioSource.clip.length);
         }
 
         public void Stop()
         {
             _audioSource.Stop();
+            CancelInvoke("CallMusicEndEvent");
+            CallMusicEndEvent();
+        }
+
+        private void CallMusicStartEvent()
+        {
+            MusicStartEvent.Invoke();
+        }
+
+        private void CallMusicEndEvent()
+        {
+            MusicEndEvent.Invoke();
         }
 
         private void SetupPlayer(MusicSystemSetup.MusicPiece musicPiece)
