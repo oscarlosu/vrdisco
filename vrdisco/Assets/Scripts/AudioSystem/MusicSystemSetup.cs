@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace MusicSystem
@@ -31,6 +32,12 @@ namespace MusicSystem
             {
                 _musicPieces[i].Id = i;
             }
+        }
+
+        [ContextMenu("Play first piece on player")]
+        public void PlayFirstMusicOnPlayer()
+        {
+            MusicPlayer.Instance.Play(_musicPieces.First());
         }
 
         [Serializable]
