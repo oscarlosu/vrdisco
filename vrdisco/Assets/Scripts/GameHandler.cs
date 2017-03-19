@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using Keyboards;
 using MusicSystem;
+using Normal.UI;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 public class GameHandler : MonoBehaviour
 {
@@ -74,6 +75,7 @@ public class GameHandler : MonoBehaviour
                 }
                 else
                 {
+                    // TODO Play error sound!
                     Debug.Log("Can't continue to next state. Player name or player character was not set.");
                 }
                 break;
@@ -83,9 +85,9 @@ public class GameHandler : MonoBehaviour
                 {
                     MusicPlayer.Instance.MusicEndEvent.RemoveListener(NextState);
                 }
-                DancingScoringTransition();
+                DancingVotingTransition();
                 break;
-            case GameState.Scoring:
+            case GameState.Voting:
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
@@ -106,6 +108,9 @@ public class GameHandler : MonoBehaviour
                 _opponentName = null; // TODO Select a random opponent and fill out name and character.
                 _opponentCharacterPrefab = null;
 
+                // Listen to keyboard input.
+                KeyboardContinue.Instance.keyPressed += KeyPressed;
+
                 // Disable double cameras (dancing) if in the same scene.
                 break;
             case GameState.Dancing:
@@ -115,7 +120,7 @@ public class GameHandler : MonoBehaviour
                     MusicPlayer.Instance.MusicEndEvent.AddListener(NextState);
                 }
                 break;
-            case GameState.Scoring:
+            case GameState.Voting:
                 break;
             default:
                 throw new ArgumentOutOfRangeException("state", state, null);
@@ -142,6 +147,9 @@ public class GameHandler : MonoBehaviour
     /// </summary>
     private void EnterPlayerNameDancingTransition()
     {
+        // Stop listening to keyboard input.
+        KeyboardContinue.Instance.keyPressed -= KeyPressed;
+
         // Maybe change scene?
 
         // Make sure two cameras are working on the computer/tv monitor.
@@ -154,18 +162,37 @@ public class GameHandler : MonoBehaviour
         EnterNewState(GameState.Dancing);
     }
 
-    private void DancingScoringTransition()
+    private void DancingVotingTransition()
     {
         // Display scoring UI, including sounds.
 
         // Set new state.
-        EnterNewState(GameState.Scoring);
+        EnterNewState(GameState.Voting);
     }
 
-    private void ScoringEnterPlayerNameTransition()
+    private void VotingEnterPlayerNameTransition()
     {
         // Set new state.
         EnterNewState(GameState.EnterPlayerName);
+    }
+
+    void KeyPressed(Keyboard keyboard, string keyPress)
+    {
+        string text = _playerName;
+
+        if (keyPress == "\b")
+        {
+            // Backspace
+            if (text.Length > 0)
+                text = text.Remove(text.Length - 1);
+        }
+        else
+        {
+            // Regular key press
+            text += keyPress;
+        }
+
+        _playerName = text;
     }
 
     public enum GameState
@@ -173,6 +200,6 @@ public class GameHandler : MonoBehaviour
         Splash,
         EnterPlayerName,
         Dancing,
-        Scoring
+        Voting
     }
 }
