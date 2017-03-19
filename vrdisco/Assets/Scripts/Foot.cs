@@ -5,15 +5,11 @@ using UnityEngine;
 [System.Serializable]
 public class Foot {
     public WandController Controller;
-    public Transform Target;
+    public Transform IKTarget;
     public Transform FootTransform;
-
-    public enum FootState {
-        Up, Down, MovingUp, MovingDown
-    }
     [HideInInspector]
-    public FootState State = FootState.Down;
+    public Vector3 LastGround;
     [HideInInspector]
-    public bool AutoLower = false;
+    public Vector3 MoveTarget;
 
 }

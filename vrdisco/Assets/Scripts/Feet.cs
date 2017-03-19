@@ -18,6 +18,11 @@ public class Feet : MonoBehaviour {
     [SerializeField]
     protected float _bodyToFloor;
 
+    [SerializeField]
+    protected float _feetVelocity;
+    [SerializeField]
+    protected float _stepHeight = 0.5f;
+
     private Foot lastFootMoved;
 
     public Vector3 FeetCenter {
@@ -33,14 +38,31 @@ public class Feet : MonoBehaviour {
         }
     }
 
+    public Vector3 BodyXZ {
+        get {
+            return _body.position - Vector3.up * _body.position.y;
+        }
+    }
+
+    [SerializeField]
+    protected Transform _groundLevel;
+
 
     void Start () {
         lastFootMoved = _left;
+
         _left.Controller.PadClicked += LiftFoot;
         _right.Controller.PadClicked += LiftFoot;
 
         _left.Controller.PadUnclicked += LowerFoot;
         _right.Controller.PadUnclicked += LowerFoot;
+
+        // Initialize feet
+        _left.MoveTarget = _left.IKTarget.position;
+        _left.LastGround = _left.IKTarget.position;
+        _right.MoveTarget = _right.IKTarget.position;
+        _right.LastGround = _right.IKTarget.position;
+
     }
 
     private void OnDisable() {
@@ -52,8 +74,25 @@ public class Feet : MonoBehaviour {
     }
 
     void Update () {
-		
-	}
+        // Register last ground for each foot
+        // Left
+        if(Mathf.Abs(_left.MoveTarget.y - _groundLevel.position.y) < Mathf.Epsilon) {
+            _left.LastGround = _left.FootTransform.position;
+        }
+        // Right
+        if (Mathf.Abs(_right.MoveTarget.y - _groundLevel.position.y) < Mathf.Epsilon) {
+            _right.LastGround = _right.FootTransform.position;
+        }
+        // Lerp towards each foot's target
+        float timeToMoveTarget = Vector3.Distance(_left.MoveTarget, _left.IKTarget.position) / _feetVelocity;
+        if(timeToMoveTarget > Mathf.Epsilon) {
+            _left.IKTarget.position = Vector3.Lerp(_left.IKTarget.position, _left.MoveTarget, Time.deltaTime / timeToMoveTarget);
+        }        
+        timeToMoveTarget = Vector3.Distance(_right.MoveTarget, _right.IKTarget.position) / _feetVelocity;
+        if(timeToMoveTarget > Mathf.Epsilon) {
+            _right.IKTarget.position = Vector3.Lerp(_right.IKTarget.position, _right.MoveTarget, _stepCurve.Evaluate(Time.deltaTime / timeToMoveTarget));
+        }        
+    }
 
     void LiftFoot(object sender, ClickedEventArgs e) {
         // Which foot?
@@ -63,42 +102,11 @@ public class Feet : MonoBehaviour {
         } else {
             f = _right;
         }
-        // Lift foot
-        if (f.State == Foot.FootState.Down) {         
-            StartCoroutine(LiftFootCo(f, e.padX, e.padY));
-        }
+        // Set target position to midstep position
+        f.MoveTarget = MidStepTarget(f.LastGround, e.padX, e.padY);
     }
 
-    IEnumerator LiftFootCo(Foot foot, float padX, float padY) {
-        foot.State = Foot.FootState.MovingUp;
-
-        Vector3 startPos = foot.FootTransform.position;
-        Vector3 xzOfsset = new Vector3(padX, 0, padY);
-        xzOfsset = xzOfsset * maxStride;
-        Vector3 targetXZ = FeetCenter + xzOfsset;
-        // Halfway through the step
-        targetXZ = (startPos + targetXZ) / 2.0f;
-
-        float duration = _stepCurve.keys[_stepCurve.length - 1].time;
-        for (float time = 0; time < duration; time += Time.deltaTime) {
-            float t = time / duration;
-            foot.Target.position = Vector3.Lerp(startPos, targetXZ + _stepCurve.Evaluate(time) * Vector3.up, t);
-            Debug.Log("Lerp time: " + t + " target pos: " + foot.Target.position);
-            yield return null;
-        }
-        foot.Target.position = Vector3.Lerp(startPos, targetXZ + _stepCurve.Evaluate(duration) * Vector3.up, 1);
-
-        
-
-        // If trackpad was released while foot was still moving up, we lower the foot automatically
-        if(foot.AutoLower) {            
-            StartCoroutine(LowerFootCo(foot, padX, padY));
-        } else {
-            foot.State = Foot.FootState.Up;
-        }
-    }
-
-
+    
     void LowerFoot(object sender, ClickedEventArgs e) {
         // Which foot?
         Foot f;
@@ -107,44 +115,19 @@ public class Feet : MonoBehaviour {
         } else {
             f = _right;
         }
-        // Lower foot
-        if (f.State == Foot.FootState.Up) {
-            StartCoroutine(LowerFootCo(f, e.padX, e.padY));
-        } else if(f.State == Foot.FootState.MovingUp) {
-            f.AutoLower = true;
-            Debug.Log("Auto lower " + Time.time);
-        }
+        // Set target position to end step position
+        f.MoveTarget = StepTarget(e.padX, e.padY);
     }
 
-    IEnumerator LowerFootCo(Foot foot, float padX, float padY) {
-        if(foot.AutoLower) {
-            Debug.Log("auto lower begun...");
-            Debug.Log("AutoLower start target pos: " + foot.Target.position);
-        }
-        foot.AutoLower = false;
-
-        foot.State = Foot.FootState.MovingDown;
-
-        Vector3 startPos = foot.FootTransform.position;
-
-        Vector3 xzOfsset = new Vector3(padX, 0, padY);
-        xzOfsset *= maxStride;
-        Vector3 targetXZ = FeetCenter + xzOfsset;
-
-        float duration = _stepCurve.keys[_stepCurve.length - 1].time;
-        for (float time = 0; time < duration; time += Time.deltaTime) {
-            float t = time / duration;
-            foot.Target.position = Vector3.Lerp(startPos + _stepCurve.Evaluate(time) * Vector3.down, targetXZ, t);
-            yield return null;
-        }
-        foot.Target.position = Vector3.Lerp(startPos + _stepCurve.Evaluate(duration) * Vector3.down, targetXZ, 1);
-        foot.State = Foot.FootState.Down;
+    Vector3 MidStepTarget(Vector3 lastGround, float padX, float padY) {
+        Vector3 stepTarget = StepTarget(padX, padY);
+        Vector3 midPointXZ = (lastGround + stepTarget) / 2.0f;
+        return midPointXZ + _stepHeight * Vector3.up;
     }
 
-    void KeepFeetNearBody() {
-
+    Vector3 StepTarget(float padX, float padY) {
+        return BodyXZ + new Vector3(padX, _groundLevel.position.y, padY);
     }
-
 
     private void OnDrawGizmos() {
         Gizmos.color = Color.green;
