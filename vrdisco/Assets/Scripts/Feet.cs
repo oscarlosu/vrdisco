@@ -7,16 +7,11 @@ public class Feet : MonoBehaviour {
     protected Foot _left;
     [SerializeField]
     protected Foot _right;
-    [SerializeField]
-    protected Transform _body;
 
     [SerializeField]
     protected float maxStride;
     [SerializeField]
     protected AnimationCurve _stepCurve;
-
-    [SerializeField]
-    protected float _bodyToFloor;
 
     [SerializeField]
     protected float _feetVelocity;
@@ -25,37 +20,18 @@ public class Feet : MonoBehaviour {
 
     private Foot lastFootMoved;
 
-    public Vector3 FeetCenter {
-        get {
-            RaycastHit hit;
-            if(Physics.Raycast(_body.position, Vector3.down, out hit, _bodyToFloor)) {
-                return hit.point;
-            } else {
-                return _body.position + _bodyToFloor * Vector3.down;
-            }
-
-            
-        }
-    }
-
-    public Vector3 BodyXZ {
-        get {
-            return _body.position - Vector3.up * _body.position.y;
-        }
-    }
-
     [SerializeField]
-    protected Transform _groundLevel;
+    protected Transform _groundLevel;    
 
 
     void Start () {
         lastFootMoved = _left;
 
-        _left.Controller.PadClicked += LiftFoot;
-        _right.Controller.PadClicked += LiftFoot;
-
-        _left.Controller.PadUnclicked += LowerFoot;
-        _right.Controller.PadUnclicked += LowerFoot;
+        // Listen to controller connection
+        _left.Controller.ControllerConnected += ListenToLeftTrackpad;
+        _left.Controller.ControllerDisconnected += StopListenToLeftTrackpad;
+        _right.Controller.ControllerConnected += ListenToRightTrackpad;
+        _right.Controller.ControllerDisconnected += StopListenToRightTrackpad;
 
         // Initialize feet
         _left.MoveTarget = _left.IKTarget.position;
@@ -65,12 +41,29 @@ public class Feet : MonoBehaviour {
 
     }
 
-    private void OnDisable() {
-        _left.Controller.PadClicked -= LiftFoot;
-        _right.Controller.PadClicked -= LiftFoot;
+    private void ListenToLeftTrackpad() {
+        _left.Controller.PadClicked += LiftFoot;
+        _left.Controller.PadUnclicked += LowerFoot;
+    }
 
+    private void StopListenToLeftTrackpad() {
+        _left.Controller.PadClicked -= LiftFoot;
         _left.Controller.PadUnclicked -= LowerFoot;
+    }
+
+    private void ListenToRightTrackpad() {
+        _right.Controller.PadClicked += LiftFoot;
+        _right.Controller.PadUnclicked += LowerFoot;
+    }
+
+    private void StopListenToRightTrackpad() {
+        _right.Controller.PadClicked -= LiftFoot;
         _right.Controller.PadUnclicked -= LowerFoot;
+    }
+
+    private void OnDisable() {
+        StopListenToLeftTrackpad();
+        StopListenToRightTrackpad();
     }
 
     void Update () {
@@ -79,6 +72,20 @@ public class Feet : MonoBehaviour {
         if(Mathf.Abs(_left.MoveTarget.y - _groundLevel.position.y) < Mathf.Epsilon) {
             _left.LastGround = _left.FootTransform.position;
         }
+
+        // Update targets with trackpad position
+        // Left
+        if(_left.Controller.isPadDown) {
+            Vector2 pad = _left.Controller.GetTouchpadAxis();
+            _left.MoveTarget = MidStepTarget(_left, pad.x, pad.y);
+        }
+        // Right
+        if (_right.Controller.isPadDown) {
+            Vector2 pad = _right.Controller.GetTouchpadAxis();
+            _right.MoveTarget = MidStepTarget(_right, pad.x, pad.y);
+        }
+
+
         // Right
         if (Mathf.Abs(_right.MoveTarget.y - _groundLevel.position.y) < Mathf.Epsilon) {
             _right.LastGround = _right.FootTransform.position;
@@ -91,7 +98,8 @@ public class Feet : MonoBehaviour {
         timeToMoveTarget = Vector3.Distance(_right.MoveTarget, _right.IKTarget.position) / _feetVelocity;
         if(timeToMoveTarget > Mathf.Epsilon) {
             _right.IKTarget.position = Vector3.Lerp(_right.IKTarget.position, _right.MoveTarget, _stepCurve.Evaluate(Time.deltaTime / timeToMoveTarget));
-        }        
+        }   
+             
     }
 
     void LiftFoot(object sender, ClickedEventArgs e) {
@@ -103,10 +111,9 @@ public class Feet : MonoBehaviour {
             f = _right;
         }
         // Set target position to midstep position
-        f.MoveTarget = MidStepTarget(f.LastGround, e.padX, e.padY);
+        f.MoveTarget = MidStepTarget(f, e.padX, e.padY);
     }
 
-    
     void LowerFoot(object sender, ClickedEventArgs e) {
         // Which foot?
         Foot f;
@@ -116,33 +123,44 @@ public class Feet : MonoBehaviour {
             f = _right;
         }
         // Set target position to end step position
-        f.MoveTarget = StepTarget(e.padX, e.padY);
+        f.MoveTarget = StepTarget(f, e.padX, e.padY);
     }
 
-    Vector3 MidStepTarget(Vector3 lastGround, float padX, float padY) {
-        Vector3 stepTarget = StepTarget(padX, padY);
-        Vector3 midPointXZ = (lastGround + stepTarget) / 2.0f;
+    Vector3 MidStepTarget(Foot foot, float padX, float padY) {
+        Vector3 stepTarget = StepTarget(foot, padX, padY);
+        Vector3 midPointXZ = (foot.LastGround + stepTarget) / 2.0f;
         return midPointXZ + _stepHeight * Vector3.up;
     }
 
-    Vector3 StepTarget(float padX, float padY) {
-        return BodyXZ + new Vector3(padX, _groundLevel.position.y, padY);
+    Vector3 StepTarget(Foot foot, float padX, float padY) {
+        return foot.CenterXZ + new Vector3(padX, 0, padY) * maxStride + Vector3.up * _groundLevel.position.y;
     }
 
-    private void OnDrawGizmos() {
-        Gizmos.color = Color.green;
+    private void OnDrawGizmos() {        
         int lines = 30;
-        
         // Valid feet area
-        if (_body != null) {
-            DrawFlatCircle(_body.position + Vector3.down * _body.position.y, lines, maxStride);
+        if (_left.Thigh != null) {
+            Gizmos.color = Color.green;
+            DrawFlatCircle(_left.Center, lines, maxStride);
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(_left.Thigh.position, _left.Center);
+        }
+        if (_right.Thigh != null) {
+            Gizmos.color = Color.green;
+            DrawFlatCircle(_right.Center, lines, maxStride);
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(_right.Thigh.position, _right.Center);
         }
 
-        Gizmos.DrawSphere(FeetCenter, 0.05f);
 
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawLine(_body.position, FeetCenter);
-
+        if(_right != null) {
+            Gizmos.color = Color.red;
+            Gizmos.DrawSphere(_right.MoveTarget, 0.05f);
+        }
+        if(_left != null) {
+            Gizmos.color = Color.red;
+            Gizmos.DrawSphere(_left.MoveTarget, 0.05f);
+        }
     }
 
     void DrawFlatCircle(Vector3 center, int lines, float radius) {

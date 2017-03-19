@@ -9,10 +9,35 @@ public class WandController : SteamVR_TrackedController {
     public SteamVR_Controller.Device controller { get { return SteamVR_Controller.Input((int)controllerIndex); } }
     public Vector3 velocity { get { return controller.velocity; } }
     public Vector3 angularVelocity { get { return controller.angularVelocity; } }
+    public bool isPadDown = false;
+    public bool isReady = false;
+
+    public event ControllerConnectedHandler ControllerConnected;
+    public event ControllerDisconnectedHandler ControllerDisconnected;
+
+    public delegate void ControllerConnectedHandler();
+    public delegate void ControllerDisconnectedHandler();
+
 
     protected override void Start () {
         base.Start();
-	}
+    }
+
+    private void OnEnable() {
+        isReady = true;
+        if(ControllerConnected != null) {
+            ControllerConnected();
+        }        
+        Debug.Log(gameObject.name + " enabled");
+    }
+
+    private void OnDisable() {
+        isReady = false;
+        if (ControllerDisconnected != null) {
+            ControllerDisconnected();
+        }
+        Debug.Log(gameObject.name + " disabled");
+    }
 
     protected override void Update () {
         base.Update();
@@ -59,10 +84,12 @@ public class WandController : SteamVR_TrackedController {
 
     public override void OnPadClicked(ClickedEventArgs e) {
         base.OnPadClicked(e);
+        isPadDown = true;
     }
 
     public override void OnPadUnclicked(ClickedEventArgs e) {
         base.OnPadUnclicked(e);
+        isPadDown = false;
     }
 
     public override void OnPadTouched(ClickedEventArgs e) {
