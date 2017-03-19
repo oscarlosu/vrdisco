@@ -38,6 +38,14 @@ public class GameHandler : MonoBehaviour
     [SerializeField]
     private string _dancingSceneName;
 
+    [Header("Transitions")]
+    [SerializeField]
+    private ScriptedAnimation _audienceCamera;
+    [SerializeField]
+    private ScriptedAnimation _dumpsterLidLeft;
+    [SerializeField]
+    private ScriptedAnimation _dumpsterLidRight;
+
     private void Awake()
     {
         if (Instance != null)
@@ -66,7 +74,10 @@ public class GameHandler : MonoBehaviour
         switch (_gameState)
         {
             case GameState.Splash:
-                SplashEnterPlayerNameTransition();
+                SplashCalibrationTransition();
+                break;
+            case GameState.CalibrationState:
+
                 break;
             case GameState.EnterPlayerName:
                 if (string.IsNullOrEmpty(_playerName) && _playerCharacterPrefab != null)
@@ -88,6 +99,7 @@ public class GameHandler : MonoBehaviour
                 DancingVotingTransition();
                 break;
             case GameState.Voting:
+                VotingCalibrationTransition();
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
@@ -100,13 +112,15 @@ public class GameHandler : MonoBehaviour
         switch (state)
         {
             case GameState.Splash:
+                _playerCharacterPrefab = null; // TODO Add random initial character from a set of characters.
+                break;
+            case GameState.CalibrationState:
+                // Enable calibration script on the camera rig.
+
                 break;
             case GameState.EnterPlayerName:
                 // Reset / Set player and opponent info.
                 _playerName = null;
-                _playerCharacterPrefab = null; // TODO Add random initial character from a set of characters.
-                _opponentName = null; // TODO Select a random opponent and fill out name and character.
-                _opponentCharacterPrefab = null;
 
                 // Listen to keyboard input.
                 KeyboardContinue.Instance.keyPressed += KeyPressed;
@@ -114,6 +128,10 @@ public class GameHandler : MonoBehaviour
                 // Disable double cameras (dancing) if in the same scene.
                 break;
             case GameState.Dancing:
+                // Load opponent.
+                _opponentName = null; // TODO Select a random opponent and fill out name and character.
+                _opponentCharacterPrefab = null;
+
                 // Register for when the music stops.
                 if (MusicPlayer.Instance != null)
                 {
@@ -130,16 +148,24 @@ public class GameHandler : MonoBehaviour
     }
 
     /// <summary>
-    /// What happens, when moving from the splash to the enter player name state.
+    /// What happens, when moving from the splash to the calibration state.
     /// </summary>
-    private void SplashEnterPlayerNameTransition()
+    private void SplashCalibrationTransition()
     {
-        // Change camera position. // NOTE Perhaps move to look at the player typing their name?
+        // Change camera position.
+        _audienceCamera.GoToNextLocation();
 
         // Close the lid of the garbage bin.
+        _dumpsterLidRight.GoToNextLocationInSeconds(0.2f);
+        _dumpsterLidLeft.GoToNextLocationInSeconds(0.4f);
 
         // Set new state.
-        EnterNewState(GameState.EnterPlayerName);
+        EnterNewState(GameState.CalibrationState);
+    }
+
+    private void CalibrationEnterPlayerNameTransition()
+    {
+        
     }
 
     /// <summary>
@@ -170,10 +196,10 @@ public class GameHandler : MonoBehaviour
         EnterNewState(GameState.Voting);
     }
 
-    private void VotingEnterPlayerNameTransition()
+    private void VotingCalibrationTransition()
     {
         // Set new state.
-        EnterNewState(GameState.EnterPlayerName);
+        EnterNewState(GameState.CalibrationState);
     }
 
     void KeyPressed(Keyboard keyboard, string keyPress)
@@ -198,6 +224,7 @@ public class GameHandler : MonoBehaviour
     public enum GameState
     {
         Splash,
+        CalibrationState,
         EnterPlayerName,
         Dancing,
         Voting

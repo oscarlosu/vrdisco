@@ -1,49 +1,15 @@
 fileFormatVersion: 2
-guid: 22daf21fb867de942812890778084184
-timeCreated: 1489933693
+guid: d25ec77f902822347b19b1d69649ff61
+timeCreated: 1489936102
 licenseType: Free
 ModelImporter:
   serializedVersion: 19
   fileIDToRecycleName:
-    100000: are
-    100002: //RootNode
-    100004: dumpster_floor
-    100006: dumpster_lid_left
-    100008: dumpster_lid_right
-    100010: dumpster_main
-    100012: garbage
-    100014: title
-    100016: your_moves
-    400000: are
-    400002: //RootNode
-    400004: dumpster_floor
-    400006: dumpster_lid_left
-    400008: dumpster_lid_right
-    400010: dumpster_main
-    400012: garbage
-    400014: title
-    400016: your_moves
-    2300000: are
-    2300002: dumpster_floor
-    2300004: dumpster_lid_left
-    2300006: dumpster_lid_right
-    2300008: dumpster_main
-    2300010: garbage
-    2300012: your_moves
-    3300000: are
-    3300002: dumpster_floor
-    3300004: dumpster_lid_left
-    3300006: dumpster_lid_right
-    3300008: dumpster_main
-    3300010: garbage
-    3300012: your_moves
-    4300000: dumpster_lid_left
-    4300002: dumpster_lid_right
-    4300004: dumpster_main
-    4300006: dumpster_floor
-    4300008: your_moves
-    4300010: are
-    4300012: garbage
+    100000: //RootNode
+    400000: //RootNode
+    2300000: //RootNode
+    3300000: //RootNode
+    4300000: box01
     9500000: //RootNode
   materials:
     importMaterials: 1
@@ -69,7 +35,7 @@ ModelImporter:
     isReadable: 1
   meshes:
     lODScreenPercentages: []
-    globalScale: 3
+    globalScale: 2
     meshCompression: 0
     addColliders: 0
     importBlendShapes: 1
