@@ -11,6 +11,7 @@ public class WandController : SteamVR_TrackedController {
     public Vector3 angularVelocity { get { return controller.angularVelocity; } }
     public bool isPadDown = false;
     public bool isReady = false;
+    public bool hideController = false;
 
     public event ControllerConnectedHandler ControllerConnected;
     public event ControllerDisconnectedHandler ControllerDisconnected;
@@ -28,6 +29,9 @@ public class WandController : SteamVR_TrackedController {
         if(ControllerConnected != null) {
             ControllerConnected();
         }        
+        if(hideController) {
+            GetComponentInChildren<SteamVR_RenderModel>().enabled = false;
+       }
         Debug.Log(gameObject.name + " enabled");
     }
 
