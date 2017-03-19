@@ -5,15 +5,32 @@ using UnityEngine;
 [System.Serializable]
 public class Foot {
     public WandController Controller;
-    public Transform Target;
+    public Transform IKTarget;
     public Transform FootTransform;
+    public Transform Thigh;
+    public float LegLength;
 
-    public enum FootState {
-        Up, Down, MovingUp, MovingDown
+    public Vector3 Center {
+        get {
+            RaycastHit hit;
+            if (Physics.Raycast(Thigh.position, Vector3.down, out hit, LegLength)) {
+                return hit.point;
+            } else {
+                return Thigh.position + LegLength * Vector3.down;
+            }
+        }
     }
+
+    public Vector3 CenterXZ {
+        get {
+            return Thigh.position - Vector3.up * Thigh.position.y;
+        }
+    }
+
+
     [HideInInspector]
-    public FootState State = FootState.Down;
+    public Vector3 LastGround;
     [HideInInspector]
-    public bool AutoLower = false;
+    public Vector3 MoveTarget;
 
 }

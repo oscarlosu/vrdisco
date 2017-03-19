@@ -16,44 +16,104 @@ public class Feet : MonoBehaviour {
     protected AnimationCurve _stepCurve;
 
     [SerializeField]
-    protected float _bodyToFloor;
+    protected float _feetVelocity;
+    [SerializeField]
+    protected float _stepHeight = 0.5f;
 
     private Foot lastFootMoved;
 
-    public Vector3 FeetCenter {
-        get {
-            RaycastHit hit;
-            if(Physics.Raycast(_body.position, Vector3.down, out hit, _bodyToFloor)) {
-                return hit.point;
-            } else {
-                return _body.position + _bodyToFloor * Vector3.down;
-            }
+    [SerializeField]
+    protected Transform _groundLevel;    
 
-            
+    public Quaternion BodyYRotation {
+        get {
+            return Quaternion.Euler(0, _body.eulerAngles.y, 0);
         }
     }
 
 
     void Start () {
         lastFootMoved = _left;
-        _left.Controller.PadClicked += LiftFoot;
-        _right.Controller.PadClicked += LiftFoot;
 
+        // Listen to controller connection
+        _left.Controller.ControllerConnected += ListenToLeftTrackpad;
+        _left.Controller.ControllerDisconnected += StopListenToLeftTrackpad;
+        _right.Controller.ControllerConnected += ListenToRightTrackpad;
+        _right.Controller.ControllerDisconnected += StopListenToRightTrackpad;
+
+        // Initialize feet
+        _left.MoveTarget = _left.IKTarget.position;
+        _left.LastGround = _left.IKTarget.position;
+        _right.MoveTarget = _right.IKTarget.position;
+        _right.LastGround = _right.IKTarget.position;
+
+    }
+
+    private void ListenToLeftTrackpad() {
+        _left.Controller.PadClicked += LiftFoot;
         _left.Controller.PadUnclicked += LowerFoot;
+    }
+
+    private void StopListenToLeftTrackpad() {
+        _left.Controller.PadClicked -= LiftFoot;
+        _left.Controller.PadUnclicked -= LowerFoot;
+    }
+
+    private void ListenToRightTrackpad() {
+        _right.Controller.PadClicked += LiftFoot;
         _right.Controller.PadUnclicked += LowerFoot;
     }
 
-    private void OnDisable() {
-        _left.Controller.PadClicked -= LiftFoot;
+    private void StopListenToRightTrackpad() {
         _right.Controller.PadClicked -= LiftFoot;
-
-        _left.Controller.PadUnclicked -= LowerFoot;
         _right.Controller.PadUnclicked -= LowerFoot;
     }
 
+    private void OnDisable() {
+        StopListenToLeftTrackpad();
+        StopListenToRightTrackpad();
+    }
+
     void Update () {
-		
-	}
+        // Register last ground for each foot
+        // Left
+        if(Mathf.Abs(_left.MoveTarget.y - _groundLevel.position.y) < Mathf.Epsilon) {
+            _left.LastGround = _left.FootTransform.position;
+        }
+
+        // Update targets with trackpad position
+        // Left
+        if(_left.Controller.isPadDown) {
+            Vector2 pad = _left.Controller.GetTouchpadAxis();
+            _left.MoveTarget = MidStepTarget(_left, pad.x, pad.y);
+        }
+        // Right
+        if (_right.Controller.isPadDown) {
+            Vector2 pad = _right.Controller.GetTouchpadAxis();
+            _right.MoveTarget = MidStepTarget(_right, pad.x, pad.y);
+        }
+
+
+        // Right
+        if (Mathf.Abs(_left.MoveTarget.y - _groundLevel.position.y) < Mathf.Epsilon) {
+            _left.LastGround = _left.FootTransform.position;
+        }
+        if (Mathf.Abs(_right.MoveTarget.y - _groundLevel.position.y) < Mathf.Epsilon) {
+            _right.LastGround = _right.FootTransform.position;
+        }
+
+
+        // Lerp towards each foot's target
+        float timeToMoveTarget = Vector3.Distance(_left.MoveTarget, _left.IKTarget.position) / _feetVelocity;
+        if(timeToMoveTarget > Mathf.Epsilon) {
+            _left.IKTarget.position = Vector3.Lerp(_left.IKTarget.position, _left.MoveTarget, Time.deltaTime / timeToMoveTarget);
+        }        
+        timeToMoveTarget = Vector3.Distance(_right.MoveTarget, _right.IKTarget.position) / _feetVelocity;
+        if(timeToMoveTarget > Mathf.Epsilon) {
+            _right.IKTarget.position = Vector3.Lerp(_right.IKTarget.position, _right.MoveTarget, _stepCurve.Evaluate(Time.deltaTime / timeToMoveTarget));
+        }   
+             
+    }
 
     void LiftFoot(object sender, ClickedEventArgs e) {
         // Which foot?
@@ -63,41 +123,9 @@ public class Feet : MonoBehaviour {
         } else {
             f = _right;
         }
-        // Lift foot
-        if (f.State == Foot.FootState.Down) {         
-            StartCoroutine(LiftFootCo(f, e.padX, e.padY));
-        }
+        // Set target position to midstep position
+        f.MoveTarget = MidStepTarget(f, e.padX, e.padY);
     }
-
-    IEnumerator LiftFootCo(Foot foot, float padX, float padY) {
-        foot.State = Foot.FootState.MovingUp;
-
-        Vector3 startPos = foot.FootTransform.position;
-        Vector3 xzOfsset = new Vector3(padX, 0, padY);
-        xzOfsset = xzOfsset * maxStride;
-        Vector3 targetXZ = FeetCenter + xzOfsset;
-        // Halfway through the step
-        targetXZ = (startPos + targetXZ) / 2.0f;
-
-        float duration = _stepCurve.keys[_stepCurve.length - 1].time;
-        for (float time = 0; time < duration; time += Time.deltaTime) {
-            float t = time / duration;
-            foot.Target.position = Vector3.Lerp(startPos, targetXZ + _stepCurve.Evaluate(time) * Vector3.up, t);
-            Debug.Log("Lerp time: " + t + " target pos: " + foot.Target.position);
-            yield return null;
-        }
-        foot.Target.position = Vector3.Lerp(startPos, targetXZ + _stepCurve.Evaluate(duration) * Vector3.up, 1);
-
-        
-
-        // If trackpad was released while foot was still moving up, we lower the foot automatically
-        if(foot.AutoLower) {            
-            StartCoroutine(LowerFootCo(foot, padX, padY));
-        } else {
-            foot.State = Foot.FootState.Up;
-        }
-    }
-
 
     void LowerFoot(object sender, ClickedEventArgs e) {
         // Which foot?
@@ -107,59 +135,46 @@ public class Feet : MonoBehaviour {
         } else {
             f = _right;
         }
-        // Lower foot
-        if (f.State == Foot.FootState.Up) {
-            StartCoroutine(LowerFootCo(f, e.padX, e.padY));
-        } else if(f.State == Foot.FootState.MovingUp) {
-            f.AutoLower = true;
-            Debug.Log("Auto lower " + Time.time);
-        }
+        // Set target position to end step position
+        f.MoveTarget = StepTarget(f, e.padX, e.padY);
     }
 
-    IEnumerator LowerFootCo(Foot foot, float padX, float padY) {
-        if(foot.AutoLower) {
-            Debug.Log("auto lower begun...");
-            Debug.Log("AutoLower start target pos: " + foot.Target.position);
-        }
-        foot.AutoLower = false;
-
-        foot.State = Foot.FootState.MovingDown;
-
-        Vector3 startPos = foot.FootTransform.position;
-
-        Vector3 xzOfsset = new Vector3(padX, 0, padY);
-        xzOfsset *= maxStride;
-        Vector3 targetXZ = FeetCenter + xzOfsset;
-
-        float duration = _stepCurve.keys[_stepCurve.length - 1].time;
-        for (float time = 0; time < duration; time += Time.deltaTime) {
-            float t = time / duration;
-            foot.Target.position = Vector3.Lerp(startPos + _stepCurve.Evaluate(time) * Vector3.down, targetXZ, t);
-            yield return null;
-        }
-        foot.Target.position = Vector3.Lerp(startPos + _stepCurve.Evaluate(duration) * Vector3.down, targetXZ, 1);
-        foot.State = Foot.FootState.Down;
+    Vector3 MidStepTarget(Foot foot, float padX, float padY) {
+        Vector3 stepTarget = StepTarget(foot, padX, padY);
+        Vector3 midPointXZ = (foot.LastGround + stepTarget) / 2.0f;
+        return midPointXZ + _stepHeight * Vector3.up;
     }
 
-    void KeepFeetNearBody() {
-
+    Vector3 StepTarget(Foot foot, float padX, float padY) {
+        // We need to make input relative to where the player is looking
+        return foot.CenterXZ + BodyYRotation * new Vector3(padX, 0, padY) * maxStride + Vector3.up * _groundLevel.position.y;
     }
 
-
-    private void OnDrawGizmos() {
-        Gizmos.color = Color.green;
+    private void OnDrawGizmos() {        
         int lines = 30;
-        
         // Valid feet area
-        if (_body != null) {
-            DrawFlatCircle(_body.position + Vector3.down * _body.position.y, lines, maxStride);
+        if (_left.Thigh != null) {
+            Gizmos.color = Color.green;
+            DrawFlatCircle(_left.Center, lines, maxStride);
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(_left.Thigh.position, _left.Center);
+        }
+        if (_right.Thigh != null) {
+            Gizmos.color = Color.green;
+            DrawFlatCircle(_right.Center, lines, maxStride);
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(_right.Thigh.position, _right.Center);
         }
 
-        Gizmos.DrawSphere(FeetCenter, 0.05f);
 
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawLine(_body.position, FeetCenter);
-
+        if(_right != null) {
+            Gizmos.color = Color.red;
+            Gizmos.DrawSphere(_right.MoveTarget, 0.05f);
+        }
+        if(_left != null) {
+            Gizmos.color = Color.red;
+            Gizmos.DrawSphere(_left.MoveTarget, 0.05f);
+        }
     }
 
     void DrawFlatCircle(Vector3 center, int lines, float radius) {
