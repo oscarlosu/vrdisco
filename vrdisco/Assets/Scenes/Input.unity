@@ -1629,11 +1629,6 @@ Prefab:
       propertyPath: m_Mesh
       value: 
       objectReference: {fileID: 1859630221}
-    - target: {fileID: 114114305712049844, guid: a88574e0da0b0914bb181fa21a0278e0,
-        type: 2}
-      propertyPath: playerHandDist
-      value: 1.732313
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_ParentPrefab: {fileID: 100100000, guid: a88574e0da0b0914bb181fa21a0278e0, type: 2}
   m_IsPrefabParent: 0
