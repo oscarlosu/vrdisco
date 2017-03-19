@@ -7,6 +7,8 @@ public class Feet : MonoBehaviour {
     protected Foot _left;
     [SerializeField]
     protected Foot _right;
+    [SerializeField]
+    protected Transform _body;
 
     [SerializeField]
     protected float maxStride;
@@ -22,6 +24,12 @@ public class Feet : MonoBehaviour {
 
     [SerializeField]
     protected Transform _groundLevel;    
+
+    public Quaternion BodyYRotation {
+        get {
+            return Quaternion.Euler(0, _body.eulerAngles.y, 0);
+        }
+    }
 
 
     void Start () {
@@ -87,9 +95,14 @@ public class Feet : MonoBehaviour {
 
 
         // Right
+        if (Mathf.Abs(_left.MoveTarget.y - _groundLevel.position.y) < Mathf.Epsilon) {
+            _left.LastGround = _left.FootTransform.position;
+        }
         if (Mathf.Abs(_right.MoveTarget.y - _groundLevel.position.y) < Mathf.Epsilon) {
             _right.LastGround = _right.FootTransform.position;
         }
+
+
         // Lerp towards each foot's target
         float timeToMoveTarget = Vector3.Distance(_left.MoveTarget, _left.IKTarget.position) / _feetVelocity;
         if(timeToMoveTarget > Mathf.Epsilon) {
@@ -133,7 +146,8 @@ public class Feet : MonoBehaviour {
     }
 
     Vector3 StepTarget(Foot foot, float padX, float padY) {
-        return foot.CenterXZ + new Vector3(padX, 0, padY) * maxStride + Vector3.up * _groundLevel.position.y;
+        // We need to make input relative to where the player is looking
+        return foot.CenterXZ + BodyYRotation * new Vector3(padX, 0, padY) * maxStride + Vector3.up * _groundLevel.position.y;
     }
 
     private void OnDrawGizmos() {        
